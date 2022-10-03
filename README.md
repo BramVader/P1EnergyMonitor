@@ -1,4 +1,4 @@
-#P1 Energy Monitor
+# P1 Energy Monitor
 
 In the Netherlands, most "smart" household E-meters must adhere to the DSMR (Dutch Smart Meter Requirements), which standardizes the way how these devices
 communicates with the energy providers. Part of the specification is also a local serial port (P1-port) which makes it possible to connect local devices
