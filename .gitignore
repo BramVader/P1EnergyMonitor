@@ -1,3 +1,5 @@
 *.code-workspace
 .vscode
 Build
+node_modules
+dist

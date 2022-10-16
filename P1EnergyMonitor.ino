@@ -1,12 +1,24 @@
+// Select either one of the target boards:
+#define ESP01
+//#define ESPDUINO
+
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <SoftwareSerial.h>
 #include "time.h"
 
+#ifdef ESPDUINO
+#include <SoftwareSerial.h>
 #define rxPin 13
-#define txPin 12
+#define P1SERIAL softSerial
+#define LED LED_BUILTIN
+#endif
+
+#ifdef ESP01
+#define P1SERIAL Serial
+#define LED 1
+#endif
 
 #define LINESIZE 75
 
@@ -14,7 +26,10 @@
 const char *ssid = "Lindendreef117";
 const char *password = "huiswerk";
 
+#ifdef ESPDUINO
 SoftwareSerial softSerial;
+#endif
+
 ESP8266WiFiMulti wiFiMulti;
 ESP8266WebServer server(80);
 
@@ -113,27 +128,27 @@ void updateBuffer(IntervalBuffer &buffer, MeterData &data)
 {
     noInterrupts();
 
-/*    
+    /*
 
-    IntervalData &interval = buffer.values[buffer.index];
+        IntervalData &interval = buffer.values[buffer.index];
 
-    // Set delta values
-    interval.tariff1In = (Int16)(data.tariff1In - buffer.header.tariff1In);    // Δ in Wh
-    interval.tariff2In = (Int16)(data.tariff2In - buffer.header.tariff2In);    // Δ in Wh
-    interval.tariff1Out = (Int16)(data.tariff1Out - buffer.header.tariff1Out); // Δ in Wh
-    interval.tariff2Out = (Int16)(data.tariff2Out - buffer.header.tariff2Out); // Δ in Wh
-    interval.gasMeter = (Int16)(data.gasMeter - buffer.header.gasMeter);       // Δ in liter
+        // Set delta values
+        interval.tariff1In = (Int16)(data.tariff1In - buffer.header.tariff1In);    // Δ in Wh
+        interval.tariff2In = (Int16)(data.tariff2In - buffer.header.tariff2In);    // Δ in Wh
+        interval.tariff1Out = (Int16)(data.tariff1Out - buffer.header.tariff1Out); // Δ in Wh
+        interval.tariff2Out = (Int16)(data.tariff2Out - buffer.header.tariff2Out); // Δ in Wh
+        interval.gasMeter = (Int16)(data.gasMeter - buffer.header.gasMeter);       // Δ in liter
 
-    // Set absolute values
-    interval.tariffType = data.tariffType;         // 1 or 2
-    interval.actualPowerOut = data.actualPowerOut; // In 0.1W
-    interval.actualPowerIn = data.actualPowerIn;   // In 0.1W
-    interval.voltage = data.voltage;               // In 0.1V
-    interval.current = data.current;               // In 0.1A
-    interval.activePowerOut = data.activePowerOut; // In 0.1W
-    interval.activePowerIn = data.activePowerIn;   // In 0.1W
+        // Set absolute values
+        interval.tariffType = data.tariffType;         // 1 or 2
+        interval.actualPowerOut = data.actualPowerOut; // In 0.1W
+        interval.actualPowerIn = data.actualPowerIn;   // In 0.1W
+        interval.voltage = data.voltage;               // In 0.1V
+        interval.current = data.current;               // In 0.1A
+        interval.activePowerOut = data.activePowerOut; // In 0.1W
+        interval.activePowerIn = data.activePowerIn;   // In 0.1W
 
-*/
+    */
 
     // Set the header values
     buffer.header.tariff1In = data.tariff1In;
@@ -196,7 +211,6 @@ void process(MeterData &data, bool loggingEnabled)
         Serial.print("gasMeter       :");
         Serial.println(data.gasMeter);
     }
-
     updateBuffer(buffers[0], data);
 }
 
@@ -281,7 +295,7 @@ void parseLine(MeterData &data, char line[])
     }
 }
 
-void printJsonName(JsonContext& context, const char* name)
+void printJsonName(JsonContext &context, const char *name)
 {
     if (!context.first)
         context.stream.concat(",\n");
@@ -293,13 +307,13 @@ void printJsonName(JsonContext& context, const char* name)
     context.first = false;
 }
 
-void printJsonValue(JsonContext& context, const char* name, int value)
+void printJsonValue(JsonContext &context, const char *name, int value)
 {
     printJsonName(context, name);
     context.stream.concat(value);
 }
 
-void printJsonValue(JsonContext& context, const char* name, bool value)
+void printJsonValue(JsonContext &context, const char *name, bool value)
 {
     printJsonName(context, name);
     context.stream.concat(value ? "true" : "false");
@@ -312,7 +326,7 @@ void handleGetRealtimeInfo()
 
     MeterData data;
     getActualValues(&data);
-    
+
     context.stream.concat("{\n");
     context.indent++;
     printJsonValue(context, "timestamp", data.timestamp);
@@ -346,8 +360,8 @@ bool connected = false;
 void setup()
 {
     initBuffers();
-    pinMode(rxPin, INPUT);
-    pinMode(LED_BUILTIN, OUTPUT);
+
+    pinMode(LED, OUTPUT);
     Serial.begin(115200);
 
     // Setup WiFi
@@ -361,6 +375,9 @@ void setup()
     wiFiMulti.addAP("Lindendreef117", "huiswerk");
 
     // We use the serial port for receiving from P1 port of E-meter
+
+#ifdef ESPDUINO
+    pinMode(rxPin, INPUT);
     softSerial.begin(115200, SWSERIAL_8N1, rxPin, -1, true);
     if (!softSerial)
     {
@@ -371,6 +388,7 @@ void setup()
             delay(1000);
         }
     }
+#endif
 }
 
 void loop()
@@ -387,9 +405,12 @@ void loop()
 
             server.on("/", HTTP_GET, handleGetRealtimeInfo);
 
-            if (MDNS.begin("esp8266")) {              // Start the mDNS responder for esp8266.local
+            if (MDNS.begin("p1mon"))
+            { // Start the mDNS responder for p1mon.local
                 Serial.println("mDNS responder started");
-            } else {
+            }
+            else
+            {
                 Serial.println("Error setting up MDNS responder!");
             }
 
@@ -400,10 +421,11 @@ void loop()
     }
     else
     {
-        if (!connected)
+        if (connected)
         {
             Serial.println("[WIFI] Disconnected!");
         }
+        connected = false;
     }
 
     if (connected)
@@ -429,17 +451,17 @@ void loop()
     if (tdiff > 200 && !dataHandled)
     { // Delay >20ms? Then entire telegram has passed
 
-        digitalWrite(LED_BUILTIN, HIGH);
+        digitalWrite(LED, HIGH);
         process(data1, loggingEnabled);
         dataHandled = true;
-        digitalWrite(LED_BUILTIN, LOW);
+        digitalWrite(LED, LOW);
     }
-    if (softSerial.available())
+    if (P1SERIAL.available())
     {
         t1 = t2;
         dataHandled = false;
 
-        char input = (char)softSerial.read() & 0x7F;
+        char input = (char)P1SERIAL.read() & 0x7F;
         line[pos++] = input;
 
         if (input == '\n' || pos >= LINESIZE)
