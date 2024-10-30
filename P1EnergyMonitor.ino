@@ -23,8 +23,8 @@
 #define LINESIZE 75
 
 // Replace with your network credentials
-const char *ssid = "Lindendreef117";
-const char *password = "huiswerk";
+const char *ssid = "*****";
+const char *password = "*****";
 
 #ifdef ESPDUINO
 SoftwareSerial softSerial;
