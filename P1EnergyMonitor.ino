@@ -372,7 +372,7 @@ void setup()
         delay(1000);
     }
     WiFi.mode(WIFI_STA);
-    wiFiMulti.addAP("Lindendreef117", "huiswerk");
+    wiFiMulti.addAP(ssid, password);
 
     // We use the serial port for receiving from P1 port of E-meter
 
